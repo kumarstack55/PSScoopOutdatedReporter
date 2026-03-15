@@ -151,8 +151,6 @@ function Invoke-ReportScoopOutdated {
             )
         }
 
-    $records
-
     if ($packages.Count -eq 0) {
         Write-Host -ForegroundColor Green "All packages are up to date."
 
