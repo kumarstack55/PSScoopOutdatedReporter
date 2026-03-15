@@ -151,6 +151,13 @@ function Invoke-ReportScoopOutdated {
             )
         }
 
+    if ($needScoopUpdate) {
+        Write-Host -NoNewLine "Scoop itself is outdated. Please run ``"
+        Write-Host -NoNewLine -ForegroundColor Yellow "scoop update"
+        Write-Host "`` to update Scoop first."
+        Write-Host ""
+    }
+
     if ($packages.Count -eq 0) {
         Write-Host -ForegroundColor Green "All packages are up to date."
 
