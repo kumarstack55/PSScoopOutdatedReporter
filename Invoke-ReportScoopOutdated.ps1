@@ -54,10 +54,20 @@ function Invoke-ReportScoopOutdated {
     [OutputType([void])]
     param()
 
+    Write-Host "Checking for outdated Scoop packages..."
     $linesWithEscapeSequences = & scoop.cmd status 2>&1
     $lines = Remove-EscapeSequencesFromLines $linesWithEscapeSequences
+
     $text = $lines -join "`n"
     $needScoopUpdate = $text -notmatch "Scoop is up to date"
+    if ($needScoopUpdate) {
+        Write-Host "Scoop itself is outdated. Running 'scoop update' to update Scoop first..."
+        & scoop update
+
+        Write-Host "Re-checking for outdated Scoop packages..."
+        $linesWithEscapeSequences = & scoop.cmd status 2>&1
+        $lines = Remove-EscapeSequencesFromLines $linesWithEscapeSequences
+    }
 
     $tableLines = Get-TableLinesFromScoopStatusLines $lines
 
@@ -81,13 +91,6 @@ function Invoke-ReportScoopOutdated {
                 $info
             )
         }
-
-    if ($needScoopUpdate) {
-        Write-Host -NoNewLine "Scoop itself is outdated. Please run ``"
-        Write-Host -NoNewLine -ForegroundColor Yellow "scoop update"
-        Write-Host "`` to update Scoop first."
-        Write-Host ""
-    }
 
     if ($packages.Count -eq 0) {
         Write-Host -ForegroundColor Green "All packages are up to date."
