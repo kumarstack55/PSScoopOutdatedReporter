@@ -13,7 +13,7 @@ It runs `scoop status`, shows the current and available versions in a readable f
 
 ```powershell
 # powershell
-git clone https://...
+git clone https://github.com/kumarstack55/PSScoopOutdatedReporter.git
 Set-Location .\PSScoopOutdatedReporter
 .\Invoke-ReportScoopOutdated.ps1
 ```
