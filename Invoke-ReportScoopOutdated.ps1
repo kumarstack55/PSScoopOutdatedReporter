@@ -20,8 +20,8 @@ function Remove-EscapeSequencesFromString {
 }
 
 function Remove-EscapeSequencesFromLines {
-    param([string[]]$lines)
-    $lines | ForEach-Object { Remove-EscapeSequencesFromString $_ }
+    param([string[]]$Lines)
+    $Lines | ForEach-Object { Remove-EscapeSequencesFromString $_ }
 }
 
 function Get-TableLinesFromScoopStatusLines {
@@ -110,6 +110,8 @@ function Invoke-ReportScoopOutdated {
         $installedVersion = $package.InstalledVersion
         $latestVersion = $package.LatestVersion
         $updateCommand = "scoop update ${name}"
+
+        # TODO: get last 10 version and commit date from scoop bucket repository.
 
         Write-Host "## $name"
 
