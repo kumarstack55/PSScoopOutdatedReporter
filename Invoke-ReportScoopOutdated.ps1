@@ -49,6 +49,95 @@ function Get-TableLinesFromScoopStatusLines {
     return $tableLines
 }
 
+function Get-ScoopManifestPath {
+    param([string]$PackageName)
+    [OutputType([string])]
+
+    $bucketsRoot = Join-Path $env:USERPROFILE "scoop\buckets"
+    if (-not (Test-Path $bucketsRoot)) {
+        return $null
+    }
+
+    foreach ($bucketDirectory in Get-ChildItem -Path $bucketsRoot -Directory -ErrorAction SilentlyContinue) {
+        $manifestPath = Join-Path $bucketDirectory.FullName "bucket\$PackageName.json"
+        if (Test-Path $manifestPath) {
+            return $manifestPath
+        }
+    }
+
+    return $null
+}
+
+class VersionInfo {
+    [string]$AppName
+    [string]$Version
+    [datetime]$Date
+
+    VersionInfo([string]$AppName, [string]$Version, [datetime]$Date) {
+        $this.AppName = $AppName
+        $this.Version = $Version
+        $this.Date = $Date
+    }
+
+    [string] GetAgoString() {
+        [datetime]$now = (Get-Date)
+        $timeSpan = $now - $this.Date
+        $days = $timeSpan.TotalDays
+        $daysInt = [math]::Floor($days)
+        if ($daysInt -ge 365) {
+            $yearsInt = [math]::Floor($daysInt / 365)
+            return "${yearsInt}y ago"
+        }
+
+        if ($daysInt -ge 1) {
+            return "${daysInt}d ago"
+        }
+
+        $hoursInt = [math]::Floor($timeSpan.TotalHours)
+        $minutesInt = [math]::Floor($timeSpan.TotalMinutes % 60)
+        return "${hoursInt}h ${minutesInt}m ago"
+    }
+}
+
+function Get-ScoopManifestVersionHistory {
+    [OutputType([object[]])]
+    param(
+        [string]$AppName,
+        [int]$Limit = 10
+    )
+
+    $manifestItem = Get-ChildItem "$env:USERPROFILE\scoop\buckets\*\bucket\${AppName}.json" -ErrorAction Stop | Select-Object -First 1
+
+    $repositoryPath = Split-Path $manifestItem.DirectoryName -Parent
+    $jsonPath = "bucket/${AppName}.json"
+
+    $seen = [System.Collections.Generic.HashSet[string]]::new()
+
+    $versionInfoArray = [System.Collections.Generic.List[object]]::new()
+
+    $hashDateArray = git -C $repositoryPath log --follow --format='%H%x09%cs' -- $jsonPath
+    foreach ($hashDate in $hashDateArray) {
+        $commitHash, $ymdString = $hashDate -split "`t", 2
+        $gitShowOutputJson = git -C $repositoryPath show "${commitHash}:${jsonPath}"
+        if (-not $gitShowOutputJson) {
+            continue
+        }
+        $data = $gitShowOutputJson | ConvertFrom-Json
+        $version = $data.version
+        if ($version -and $seen.Add($version)) {
+            $date = [datetime]::ParseExact($ymdString, 'yyyy-MM-dd', $null)
+            $versionInfo = [VersionInfo]::new($AppName, $version, $date)
+            $versionInfoArray.Add($versionInfo) | Out-Null
+
+            if ($versionInfoArray.Count -ge $Limit) {
+                break
+            }
+        }
+    }
+
+    return $versionInfoArray
+}
+
 function Invoke-ReportScoopOutdated {
     [CmdletBinding()]
     [OutputType([void])]
@@ -109,21 +198,26 @@ function Invoke-ReportScoopOutdated {
         $name = $package.Name
         $installedVersion = $package.InstalledVersion
         $latestVersion = $package.LatestVersion
-        $updateCommand = "scoop update ${name}"
-
-        # TODO: get last 10 version and commit date from scoop bucket repository.
 
         Write-Host "## $name"
 
-        Write-Host -NoNewLine "To upgrade from "
-        Write-Host -NoNewLine -ForegroundColor Red ${installedVersion}
-        Write-Host -NoNewLine " to "
-        Write-Host -NoNewLine -ForegroundColor Green ${latestVersion}
-        Write-Host -NoNewLine ", run: ``"
-        Write-Host -NoNewLine -ForegroundColor Yellow ${updateCommand}
-        Write-Host -NoNewLine "``"
+        $versionInfoArray = Get-ScoopManifestVersionHistory -AppName $name -Limit 10
+        foreach ($versionInfo in $versionInfoArray) {
+            $updateVersion = $versionInfo.Version
+            $updateCommand = "scoop update ${name}@${updateVersion}"
+            $agoString = $versionInfo.GetAgoString()
+            $to = "${updateVersion} (${agoString})"
 
-        Write-Host "."
+            Write-Host -NoNewLine "To upgrade from "
+            Write-Host -NoNewLine -ForegroundColor Red ${installedVersion}
+            Write-Host -NoNewLine " to "
+            Write-Host -NoNewLine -ForegroundColor Green ${to}
+            Write-Host -NoNewLine ", run: ``"
+            Write-Host -NoNewLine -ForegroundColor Yellow ${updateCommand}
+            Write-Host -NoNewLine "``"
+            Write-Host "."
+        }
+
         Write-Host ""
     }
     Read-Host "Press Enter to exit..."
