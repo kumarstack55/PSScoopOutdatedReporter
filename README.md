@@ -38,6 +38,28 @@ $shortcut.Arguments = "-ExecutionPolicy Bypass -NoProfile -File `"$scriptPath`""
 $shortcut.Save()
 ```
 
+If you want to run this script in Windows Terminal, you can create a shortcut and add it to the Windows Terminal settings.
+
+```powershell
+# powershell
+Set-Location .\PSScoopOutdatedReporter
+
+$location = Get-Location
+$path = $location.Path
+$scriptPath = Join-Path $path "Invoke-ReportScoopOutdated.ps1"
+
+$startupFolder = [Environment]::GetFolderPath("Startup")
+$shortcutPath = Join-Path $startupFolder "ReportScoopOutdated.lnk"
+
+$wshShell = New-Object -ComObject WScript.Shell
+$shortcut = $wshShell.CreateShortcut($shortcutPath)
+$shortcut.TargetPath = "wt.exe"
+$windowsTerminalTitle = "Report Scoop Outdated"
+$arguments = "-w 0 new-tab --title `"$windowsTerminalTitle`" powershell.exe -ExecutionPolicy Bypass -NoProfile -File `"$scriptPath`""
+$shortcut.Arguments = $arguments
+$shortcut.Save()
+```
+
 ## License
 
 MIT
